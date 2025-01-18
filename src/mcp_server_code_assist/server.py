@@ -1,3 +1,4 @@
+import os
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -7,8 +8,8 @@ from mcp.server.stdio import stdio_server
 from mcp.types import GetPromptResult, Prompt, TextContent, Tool
 
 from mcp_server_code_assist.prompts.prompt_manager import get_prompts, handle_prompt
-from mcp_server_code_assist.tools.models import CreateDirectory, FileCreate, FileDelete, FileModify, FileRead, FileRewrite, FileTree, GitDiff, GitLog, GitShow, GitStatus, ListDirectory
-from mcp_server_code_assist.tools.tools_manager import get_dir_tools, get_file_tools, get_git_tools
+from mcp_server_code_assist.tools.models import AskInternet, CreateDirectory, FileCreate, FileDelete, FileModify, FileRead, FileRewrite, FileTree, GitDiff, GitLog, GitShow, GitStatus, ListDirectory
+from mcp_server_code_assist.tools.tools_manager import get_dir_tools, get_file_tools, get_git_tools, get_internet_tools
 
 
 class CodeAssistTools(str, Enum):
@@ -29,6 +30,7 @@ class CodeAssistTools(str, Enum):
     GIT_DIFF = "git_diff"
     GIT_LOG = "git_log"
     GIT_SHOW = "git_show"
+    ASK_INTERNET = "ask_internet"
 
 
 async def process_instruction(instruction: dict[str, Any], repo_path: Path) -> dict[str, Any]:
@@ -74,7 +76,7 @@ async def serve(working_dir: Path | None) -> None:
 
     @server.list_tools()
     async def list_tools() -> list[Tool]:
-        return [
+        tools = [
             # Directory operations
             Tool(
                 name=CodeAssistTools.LIST_DIRECTORY,
@@ -139,6 +141,15 @@ async def serve(working_dir: Path | None) -> None:
                 inputSchema=GitShow.model_json_schema(),
             ),
         ]
+        if os.getenv("PERPLEXITY_API_KEY"):
+            tools.append(
+                Tool(
+                    name=CodeAssistTools.ASK_INTERNET,
+                    description="Asks questions to Internet and returns answer with citations",
+                    inputSchema=AskInternet.model_json_schema(),
+                )
+            )
+        return tools
 
     @server.list_prompts()
     async def list_prompts() -> list[Prompt]:
@@ -209,6 +220,11 @@ async def serve(working_dir: Path | None) -> None:
             case CodeAssistTools.GIT_SHOW:
                 model = GitShow(repo_path=arguments["repo_path"], revision=arguments["commit"])
                 result = await git_tools.show(model.repo_path, model.revision)
+                return [TextContent(type="text", text=result)]
+            case CodeAssistTools.ASK_INTERNET:
+                model = AskInternet(query=arguments["query"])
+                internet_tools = get_internet_tools()
+                result = await internet_tools.ask(model.query)
                 return [TextContent(type="text", text=result)]
             case _:
                 raise ValueError(f"Unknown tool: {name}")

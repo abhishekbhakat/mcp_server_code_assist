@@ -71,3 +71,9 @@ class RepositoryOperation(BaseModel):
     path: str
     content: str | None = None
     replacements: dict[str, str] | None = None
+
+
+# Internet operations
+# ====================================================================
+class AskInternet(BaseModel):
+    query: str
