@@ -25,10 +25,32 @@ class GitTools(BaseTools):
         repo = git.Repo(repo_path)
         return repo.git.status()
 
-    async def diff(self, repo_path: str, target: str | None = None) -> str:
-        """Show git diff."""
+    async def diff(self, repo_path: str, path: str | None = None, cached: bool = False, staged: bool = False, commit: str | None = None, compare_to: str | None = None) -> str:
+        """Show git diff with flexible options.
+
+        Args:
+            repo_path: Path to the git repository
+            path: Optional specific file or directory path to diff
+            cached: Show diff of staged changes
+            staged: Alias for cached
+            commit: Show changes in the working tree relative to the named commit
+            compare_to: When specified with commit, show changes between two arbitrary commits
+
+        Returns:
+            String representation of the diff
+        """
         repo = git.Repo(repo_path)
-        return repo.git.diff(target) if target else repo.git.diff()
+        args = []
+        if cached or staged:
+            args.append("--cached")
+        if commit:
+            args.append(commit)
+        if compare_to:
+            args.append(compare_to)
+        if path:
+            args.append("--")
+            args.append(path)
+        return repo.git.diff(*args)
 
     async def log(self, repo_path: str, max_count: int = 10) -> str:
         """Show git commit history."""

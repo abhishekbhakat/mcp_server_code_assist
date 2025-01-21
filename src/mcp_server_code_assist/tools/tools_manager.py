@@ -4,11 +4,13 @@ from mcp_server_code_assist.tools.dir_tools import DirTools
 from mcp_server_code_assist.tools.file_tools import FileTools
 from mcp_server_code_assist.tools.git_tools import GitTools
 from mcp_server_code_assist.tools.internet_tools import InternetTools
+from mcp_server_code_assist.tools.specialized_prompt_tools import SpecializedPromptTools
 
 _file_tools: FileTools | None = None
 _dir_tools: DirTools | None = None
 _git_tools: GitTools | None = None
 _internet_tools: InternetTools | None = None
+_specialized_prompt_tools: SpecializedPromptTools | None = None
 
 
 def get_file_tools(allowed_paths: list[str]) -> FileTools:
@@ -66,3 +68,15 @@ def get_internet_tools() -> InternetTools:
     if not _internet_tools:
         _internet_tools = InternetTools()
     return _internet_tools
+
+
+def get_specialized_prompt_tools() -> SpecializedPromptTools:
+    """Get or create SpecializedPromptTools instance.
+
+    Returns:
+        SpecializedPromptTools instance
+    """
+    global _specialized_prompt_tools
+    if not _specialized_prompt_tools:
+        _specialized_prompt_tools = SpecializedPromptTools()
+    return _specialized_prompt_tools

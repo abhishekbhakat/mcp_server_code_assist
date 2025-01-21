@@ -2,10 +2,10 @@
 
 from mcp.types import GetPromptResult, Prompt, PromptMessage, TextContent
 
-from mcp_server_code_assist.prompts.git_prompt import git_prompts, handle_git_prompt
+from mcp_server_code_assist.prompts.code_assist_init_prompt import code_assist_init_prompt
 
 PROMPTS = {
-    **git_prompts,
+    "code-assist-init": code_assist_init_prompt,
 }
 
 
@@ -29,8 +29,5 @@ async def handle_prompt(name: str, arguments: dict[str, str] | None = None) -> G
     """
     if name not in PROMPTS:
         raise ValueError(f"Prompt not found: {name}")
-
-    if name.startswith("git-"):
-        return await handle_git_prompt(name, arguments)
 
     return GetPromptResult(messages=[PromptMessage(role="user", content=TextContent(text=f"Unhandled prompt: {name}"))])

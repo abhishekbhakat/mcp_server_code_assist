@@ -1,13 +1,20 @@
 from pathlib import Path
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 
 # File operations
 # ====================================================================
 class FileCreate(BaseModel):
     path: str | Path
-    content: str = ""
+    content: str | None = None
+    xml_content: str | None = None
+
+    @model_validator(mode="after")
+    def check_content_or_xml(self) -> "FileCreate":
+        if not self.content and not self.xml_content:
+            raise ValueError("Must provide either content or xml_content")
+        return self
 
 
 class FileDelete(BaseModel):
@@ -16,7 +23,8 @@ class FileDelete(BaseModel):
 
 class FileModify(BaseModel):
     path: str | Path
-    replacements: dict[str, str]
+    replacements: dict[str, str] | None = None
+    xml_content: str | None = None
 
 
 class FileRead(BaseModel):
@@ -26,6 +34,7 @@ class FileRead(BaseModel):
 class FileRewrite(BaseModel):
     path: str | Path
     content: str
+    xml_content: str | None = None
 
 
 class FileTree(BaseModel):
@@ -48,9 +57,12 @@ class GitBase(BaseModel):
     repo_path: str
 
 
-class GitDiff(BaseModel):
-    repo_path: str
-    target: str
+class GitDiff(GitBase):
+    path: str | None = None
+    cached: bool = False
+    staged: bool = False
+    commit: str | None = None
+    compare_to: str | None = None
 
 
 class GitShow(BaseModel):
@@ -77,3 +89,14 @@ class RepositoryOperation(BaseModel):
 # ====================================================================
 class AskInternet(BaseModel):
     query: str
+
+
+# Specialized Prompt tools
+# ====================================================================
+class GenerateGitCommands(BaseModel):
+    repo_path: str
+    operation: str
+
+
+class GenerateCliCommands(BaseModel):
+    operation: str

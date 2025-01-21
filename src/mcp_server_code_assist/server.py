@@ -8,8 +8,24 @@ from mcp.server.stdio import stdio_server
 from mcp.types import GetPromptResult, Prompt, TextContent, Tool
 
 from mcp_server_code_assist.prompts.prompt_manager import get_prompts, handle_prompt
-from mcp_server_code_assist.tools.models import AskInternet, CreateDirectory, FileCreate, FileDelete, FileModify, FileRead, FileRewrite, FileTree, GitDiff, GitLog, GitShow, GitStatus, ListDirectory
-from mcp_server_code_assist.tools.tools_manager import get_dir_tools, get_file_tools, get_git_tools, get_internet_tools
+from mcp_server_code_assist.tools.models import (
+    AskInternet,
+    CreateDirectory,
+    FileCreate,
+    FileDelete,
+    FileModify,
+    FileRead,
+    FileRewrite,
+    FileTree,
+    GenerateCliCommands,
+    GenerateGitCommands,
+    GitDiff,
+    GitLog,
+    GitShow,
+    GitStatus,
+    ListDirectory,
+)
+from mcp_server_code_assist.tools.tools_manager import get_dir_tools, get_file_tools, get_git_tools, get_internet_tools, get_specialized_prompt_tools
 
 
 class CodeAssistTools(str, Enum):
@@ -32,23 +48,28 @@ class CodeAssistTools(str, Enum):
     GIT_SHOW = "git_show"
     ASK_INTERNET = "ask_internet"
 
+    # Specialized Prompt Tools
+    GENERATE_CLI_COMMANDS = "generate_cli_commands"
+    GENERATE_GIT_COMMANDS = "generate_git_commands"
+
 
 async def process_instruction(instruction: dict[str, Any], repo_path: Path) -> dict[str, Any]:
     file_tools = get_file_tools([str(repo_path)])
     dir_tools = get_dir_tools([str(repo_path)])
     git_tools = get_git_tools([str(repo_path)])
+    internet_tools = get_internet_tools()
+    specialized_prompt_tools = get_specialized_prompt_tools()
+
     try:
         match instruction["type"]:
+            case "create_file":
+                return {"message": await file_tools.create_file(instruction["path"], content=instruction["content"])}
+            case "modify_file":
+                return {"diff": await file_tools.modify_file(instruction["path"], replacements=instruction["replacements"])}
+            case "rewrite_file":
+                return {"diff": await file_tools.rewrite_file(instruction["path"], content=instruction["content"])}
             case "read_file":
                 return {"content": await file_tools.read_file(instruction["path"])}
-            case "read_multiple":
-                return {"contents": await file_tools.read_multiple_files(instruction["paths"])}
-            case "create_file":
-                return {"message": await file_tools.create_file(instruction["path"], instruction["content"])}
-            case "modify_file":
-                return {"diff": await file_tools.modify_file(instruction["path"], instruction["replacements"])}
-            case "rewrite_file":
-                return {"diff": await file_tools.rewrite_file(instruction["path"], instruction["content"])}
             case "delete_file":
                 return {"message": await file_tools.delete_file(instruction["path"])}
             case "file_tree":
@@ -64,6 +85,12 @@ async def process_instruction(instruction: dict[str, Any], repo_path: Path) -> d
                 return {"log": git_tools.log(str(repo_path), instruction.get("max_count", 10))}
             case "git_show":
                 return {"show": git_tools.show(str(repo_path), instruction["commit"])}
+            case "ask_internet":
+                return await internet_tools.ask(instruction["query"])
+            case "generate_cli_commands":
+                return await specialized_prompt_tools.generate_cli_commands(instruction["query"])
+            case "generate_git_commands":
+                return await specialized_prompt_tools.generate_git_commands(instruction["query"])
             case _:
                 raise ValueError(f"Unknown instruction type: {instruction['type']}")
     except Exception as e:
@@ -140,9 +167,21 @@ async def serve(working_dir: Path | None) -> None:
                 description="Shows git commit details",
                 inputSchema=GitShow.model_json_schema(),
             ),
+            # Specialized Prompt Tools
+            Tool(
+                name=CodeAssistTools.GENERATE_CLI_COMMANDS,
+                description="Generates CLI commands based on a prompt for which tools are not available",
+                inputSchema=GenerateCliCommands.model_json_schema(),
+            ),
+            Tool(
+                name=CodeAssistTools.GENERATE_GIT_COMMANDS,
+                description="Generates git commands based on a prompt for which tools are not available",
+                inputSchema=GenerateGitCommands.model_json_schema(),
+            ),
         ]
         if os.getenv("PERPLEXITY_API_KEY"):
             tools.append(
+                # Internet operations
                 Tool(
                     name=CodeAssistTools.ASK_INTERNET,
                     description="Asks questions to Internet and returns answer with citations",
@@ -166,6 +205,8 @@ async def serve(working_dir: Path | None) -> None:
         file_tools = get_file_tools(paths)
         dir_tools = get_dir_tools(paths)
         git_tools = get_git_tools(paths)
+        internet_tools = get_internet_tools()
+        specialized_prompt_tools = get_specialized_prompt_tools()
 
         match name:
             # Directory operations
@@ -223,8 +264,17 @@ async def serve(working_dir: Path | None) -> None:
                 return [TextContent(type="text", text=result)]
             case CodeAssistTools.ASK_INTERNET:
                 model = AskInternet(query=arguments["query"])
-                internet_tools = get_internet_tools()
                 result = await internet_tools.ask(model.query)
+                return [TextContent(type="text", text=result)]
+
+            # Specialized Prompt Tools
+            case CodeAssistTools.GENERATE_CLI_COMMANDS:
+                model = GenerateCliCommands(operation=arguments["operation"])
+                result = await specialized_prompt_tools.generate_cli_commands(model.operation)
+                return [TextContent(type="text", text=result)]
+            case CodeAssistTools.GENERATE_GIT_COMMANDS:
+                model = GenerateGitCommands(repo_path=arguments["repo_path"], operation=arguments["operation"])
+                result = await specialized_prompt_tools.generate_git_commands(model.repo_path, model.operation)
                 return [TextContent(type="text", text=result)]
             case _:
                 raise ValueError(f"Unknown tool: {name}")

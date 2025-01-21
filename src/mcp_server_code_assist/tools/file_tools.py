@@ -22,21 +22,22 @@ class FileTools(BaseTools):
     async def read_file(self, path: str) -> str:
         path = await self.validate_path(path)
         try:
-            return path.read_text()
+            content = path.read_text()
+            return content
         except Exception as e:
-            self.handle_error(e, {"operation": "read", "path": str(path)})
+            error_message = self.handle_error(e, {"operation": "read", "path": str(path)})
+            return f"Error reading file: {error_message}"
 
-    async def write_file(self, path: str, content: str) -> None:
+    async def create_file(self, path: str, content: str | None = None, xml_content: str | None = None) -> str:
         path = await self.validate_path(path)
         try:
+            actual_content = xml_content or content or ""
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(content)
+            path.write_text(actual_content)
+            return f"Created file: {path}"
         except Exception as e:
-            self.handle_error(e, {"operation": "write", "path": str(path)})
-
-    async def create_file(self, path: str, content: str = "") -> str:
-        await self.write_file(path, content)
-        return f"Created file: {path}"
+            error_message = self.handle_error(e, {"operation": "create_file", "path": str(path)})
+            return f"Error creating file: {error_message}"
 
     async def delete_file(self, path: str) -> str:
         path = await self.validate_path(path)
@@ -58,20 +59,32 @@ class FileTools(BaseTools):
 
     async def modify_file(self, path: str, replacements: dict[str, str]) -> str:
         path = await self.validate_path(path)
-        content = await self.read_file(path)
-        original = content
+        original_content = await self.read_file(path)
+        content = original_content
 
         for old, new in replacements.items():
             content = content.replace(old, new)
 
-        await self.write_file(path, content)
-        return self.generate_diff(original, content)
+        diff = self.generate_diff(original_content, content)
+        if not diff:
+            raise ValueError("No changes detected in the file content")
 
-    async def rewrite_file(self, path: str, content: str) -> str:
-        path = await self.validate_path(path)
-        original = await self.read_file(path) if path.exists() else ""
         await self.write_file(path, content)
-        return self.generate_diff(original, content)
+        return diff
+
+    async def rewrite_file(self, path: str, content: str | None = None) -> str:
+        path = await self.validate_path(path)
+        original_content = await self.read_file(path) if path.exists() else ""
+
+        if content is None:
+            raise ValueError("Content must be provided")
+
+        diff = self.generate_diff(original_content, content)
+        if not diff:
+            raise ValueError("No changes detected in the file content")
+
+        await self.write_file(path, content)
+        return diff
 
     @staticmethod
     def generate_diff(original: str, modified: str) -> str:
