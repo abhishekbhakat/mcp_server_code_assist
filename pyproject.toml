@@ -55,7 +55,8 @@ lint.select = [
 
 lint.ignore = [
     "C416",  # Unnecessary list comprehension - rewrite as a generator expression
-    "C408"  # Unnecessary `dict` call - rewrite as a literal
+    "C408",  # Unnecessary `dict` call - rewrite as a literal
+    "ISC001"  # Single line implicit string concatenation
 ]
 
 lint.fixable = ["ALL"]
