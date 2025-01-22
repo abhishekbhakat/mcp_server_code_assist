@@ -28,13 +28,59 @@ class FileTools(BaseTools):
             error_message = self.handle_error(e, {"operation": "read", "path": str(path)})
             return f"Error reading file: {error_message}"
 
+    async def _write_file(self, path: str, content: str) -> str:
+        path = await self.validate_path(path)
+        try:
+            path.write_text(content)
+            return f"Written to file: {path}"
+        except Exception as e:
+            error_message = self.handle_error(e, {"operation": "write", "path": str(path)})
+            return f"Error writing file: {error_message}"
+
     async def create_file(self, path: str, content: str | None = None, xml_content: str | None = None) -> str:
         path = await self.validate_path(path)
         try:
-            actual_content = xml_content or content or ""
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(actual_content)
-            return f"Created file: {path}"
+            actual_content = content or ""
+            target_path = path
+
+            if xml_content:
+                import xml.etree.ElementTree as ET
+
+                root = ET.fromstring(xml_content)
+
+                if root.tag == "file":
+                    # Extract path from XML if specified
+                    if xml_path := root.get("path"):
+                        # Resolve relative to first allowed directory
+                        base_path = Path(self.allowed_paths[0]) if self.allowed_paths else Path.cwd()
+                        target_path = (base_path / xml_path).resolve()
+
+                        # Re-validate with resolved path
+                        target_path = await self.validate_path(str(target_path))
+                    else:
+                        raise ValueError("Path not specified in XML")
+
+                    # Extract content from all <change> elements
+                    actual_content = ""
+                    for change in root.findall("change"):
+                        content_node = change.find("content")
+                        if content_node is not None and content_node.text:
+                            actual_content += content_node.text.strip() + "\n"
+
+                    if not actual_content:
+                        raise ValueError("No valid <content> found in <change> elements")
+
+                else:
+                    raise ValueError(f"Invalid XML root tag: {root.tag}")
+
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                target_path.write_text(actual_content.strip())
+                return f"Created file: {target_path}"
+            else:
+                # Handle regular file creation without XML
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                target_path.write_text(actual_content.strip())
+                return f"Created file: {target_path}"
         except Exception as e:
             error_message = self.handle_error(e, {"operation": "create_file", "path": str(path)})
             return f"Error creating file: {error_message}"
@@ -69,7 +115,7 @@ class FileTools(BaseTools):
         if not diff:
             raise ValueError("No changes detected in the file content")
 
-        await self.write_file(path, content)
+        await self._write_file(path, content)
         return diff
 
     async def rewrite_file(self, path: str, content: str | None = None) -> str:
@@ -83,7 +129,7 @@ class FileTools(BaseTools):
         if not diff:
             raise ValueError("No changes detected in the file content")
 
-        await self.write_file(path, content)
+        await self._write_file(path, content)
         return diff
 
     @staticmethod

@@ -225,8 +225,8 @@ async def serve(working_dir: Path | None) -> None:
                 result = await file_tools.read_file(model.path)
                 return [TextContent(type="text", text=result)]
             case CodeAssistTools.CREATE_FILE:
-                model = FileCreate(path=arguments["path"], content=arguments["content"])
-                result = await file_tools.create_file(model.path, model.content)
+                model = FileCreate(path=arguments["path"], content=arguments.get("content"), xml_content=arguments.get("xml_content"))
+                result = await file_tools.create_file(model.path, model.content, model.xml_content)
                 return [TextContent(type="text", text=result)]
             case CodeAssistTools.MODIFY_FILE:
                 model = FileModify(path=arguments["path"], replacements=arguments["replacements"])
