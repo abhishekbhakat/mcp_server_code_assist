@@ -73,8 +73,7 @@ async def process_instruction(instruction: dict[str, Any], repo_path: Path) -> d
             case "delete_file":
                 return {"message": await file_tools.delete_file(instruction["path"])}
             case "file_tree":
-                tree, dirs, files = await file_tools.file_tree(instruction["path"])
-                return {"tree": tree, "directories": dirs, "files": files}
+                return {"tree": await file_tools.file_tree(instruction["path"])}
             case "list_directory":
                 return {"content": await dir_tools.list_directory(instruction["path"])}
             case "git_status":

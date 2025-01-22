@@ -233,7 +233,7 @@ class FileTools(BaseTools):
         tracked_files = self._get_tracked_files(path)
         gitignore = self._load_gitignore(path) if tracked_files is None else []
 
-        def gen_tree(path: Path, prefix: str = "") -> tuple[list[str], int, int]:
+        def gen_tree(path: Path, prefix: str = "") -> str:
             entries = []
             dir_count = 0
             file_count = 0
