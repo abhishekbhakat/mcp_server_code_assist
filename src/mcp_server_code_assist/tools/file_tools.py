@@ -56,6 +56,10 @@ class FileTools(BaseTools):
 
                         # Re-validate with resolved path
                         target_path = await self.validate_path(str(target_path))
+
+                        # Check if XML path matches parameter path
+                        if str(target_path) != str(path):
+                            raise ValueError(f"XML path '{xml_path}' does not match parameter path '{path}'")
                     else:
                         raise ValueError("Path not specified in XML")
 

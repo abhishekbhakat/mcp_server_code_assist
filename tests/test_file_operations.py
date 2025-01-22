@@ -60,10 +60,11 @@ async def test_create_delete_file(file_tools):
 
 
 @pytest.mark.asyncio
-async def test_create_file_with_xml_content(file_tools, test_dir):
+async def test_create_file_with_xml_content(file_tools):
     """Test file creation using XML content specification"""
-    xml_content = """<?xml version="1.0"?>
-    <file path="xml_created.txt" action="create">
+    test_file = TEST_DIR / "xml_created.txt"
+    xml_content = f"""<?xml version="1.0"?>
+    <file path="{test_file}" action="create">
         <change>
             <content><![CDATA[
                 import pytest
@@ -73,17 +74,16 @@ async def test_create_file_with_xml_content(file_tools, test_dir):
         </change>
     </file>"""
 
-    # Create file using XML content
     result = await file_tools.create_file(
-        str(test_dir / "dummy.txt"),  # Ignored in favor of XML path
+        str(test_file),
         xml_content=xml_content,
     )
 
-    # Verify file creation and content
-    created_file = test_dir / "xml_created.txt"
     assert "Created file" in result
-    assert created_file.exists()
-    assert "import pytest" in created_file.read_text()
+    assert test_file.exists()
+    assert "import pytest" in test_file.read_text()
+    assert "def test_new_case():" in test_file.read_text()
+    assert "assert True" in test_file.read_text()
 
 
 @pytest.mark.asyncio
