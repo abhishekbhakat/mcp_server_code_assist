@@ -1,6 +1,7 @@
 import difflib
 import fnmatch
 import os
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import git
@@ -44,8 +45,6 @@ class FileTools(BaseTools):
             target_path = path
 
             if xml_content:
-                import xml.etree.ElementTree as ET
-
                 root = ET.fromstring(xml_content)
 
                 if root.tag == "file":
@@ -118,18 +117,34 @@ class FileTools(BaseTools):
         await self._write_file(path, content)
         return diff
 
-    async def rewrite_file(self, path: str, content: str | None = None) -> str:
+    async def rewrite_file(self, path: str, content: str | None = None, xml_content: str | None = None) -> str:
+        if xml_content:
+            tree = ET.fromstring(xml_content)
+
+            # Use the root element directly since it's the 'file' element
+            file_element = tree if tree.tag == "file" else None
+            if file_element is None:
+                raise ValueError("Invalid XML: root element must be 'file'")
+            xml_path = file_element.get("path")
+            if xml_path != path:
+                raise ValueError(f"XML path '{xml_path}' does not match parameter path '{path}'")
+            content_element = file_element.find(".//content")
+            if content_element is None or not content_element.text:
+                raise ValueError("Invalid XML: missing or empty 'content' element")
+            actual_content = content_element.text.strip()
+        elif content is not None:
+            actual_content = content
+        else:
+            raise ValueError("Either content or xml_content must be provided")
+
         path = await self.validate_path(path)
         original_content = await self.read_file(path) if path.exists() else ""
 
-        if content is None:
-            raise ValueError("Content must be provided")
-
-        diff = self.generate_diff(original_content, content)
+        diff = self.generate_diff(original_content, actual_content)
         if not diff:
             raise ValueError("No changes detected in the file content")
 
-        await self._write_file(path, content)
+        await self._write_file(path, actual_content)
         return diff
 
     @staticmethod

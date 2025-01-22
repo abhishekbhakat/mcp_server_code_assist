@@ -115,6 +115,29 @@ async def test_rewrite_file(file_tools):
 
 
 @pytest.mark.asyncio
+async def test_rewrite_file_with_xml_content(file_tools):
+    test_file = TEST_DIR / "rewrite_xml.txt"
+    original_content = "Original content"
+    await file_tools.create_file(str(test_file), content=original_content)
+
+    xml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
+<file action="rewrite_file" path="{test_file}">
+    <change>
+        <content>import os
+def new_function():
+    return os.getcwd()</content>
+    </change>
+</file>"""
+
+    diff = await file_tools.rewrite_file(str(test_file), xml_content=xml_content)
+
+    assert "import os" in await file_tools.read_file(str(test_file))
+    assert "-Original content" in diff
+    assert "+import os" in diff
+    assert "+def new_function():" in diff
+
+
+@pytest.mark.asyncio
 async def test_file_tree(file_tools):
     # Create test structure
     (TEST_DIR / "dir1").mkdir()
