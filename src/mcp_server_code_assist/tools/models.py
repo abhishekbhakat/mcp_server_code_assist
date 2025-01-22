@@ -26,6 +26,12 @@ class FileModify(BaseModel):
     replacements: dict[str, str] | None = None
     xml_content: str | None = None
 
+    @model_validator(mode="after")
+    def check_content_or_xml(self) -> "FileModify":
+        if not self.content and not self.xml_content:
+            raise ValueError("Must provide either content or xml_content")
+        return self
+
 
 class FileRead(BaseModel):
     path: str | Path
@@ -33,8 +39,14 @@ class FileRead(BaseModel):
 
 class FileRewrite(BaseModel):
     path: str | Path
-    content: str
+    content: str | None = None
     xml_content: str | None = None
+
+    @model_validator(mode="after")
+    def check_content_or_xml(self) -> "FileRewrite":
+        if not self.content and not self.xml_content:
+            raise ValueError("Must provide either content or xml_content")
+        return self
 
 
 class FileTree(BaseModel):
