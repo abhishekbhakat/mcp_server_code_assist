@@ -117,7 +117,7 @@ async def serve(working_dir: Path | None) -> None:
             # File operations
             Tool(
                 name=CodeAssistTools.CREATE_FILE,
-                description="Creates a new file with content",
+                description="Creates a new file with content (can accept xml_content)",
                 inputSchema=FileCreate.model_json_schema(),
             ),
             Tool(
@@ -127,12 +127,12 @@ async def serve(working_dir: Path | None) -> None:
             ),
             Tool(
                 name=CodeAssistTools.MODIFY_FILE,
-                description="Modifies parts of a file using string replacements",
+                description="Modifies parts of a file using string replacements (can accept xml_content)",
                 inputSchema=FileModify.model_json_schema(),
             ),
             Tool(
                 name=CodeAssistTools.REWRITE_FILE,
-                description="Rewrites entire file content",
+                description="Rewrites entire file content (can accept xml_content)",
                 inputSchema=FileRewrite.model_json_schema(),
             ),
             Tool(
