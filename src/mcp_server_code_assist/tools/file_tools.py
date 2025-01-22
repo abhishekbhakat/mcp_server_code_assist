@@ -48,6 +48,11 @@ class FileTools(BaseTools):
                 root = ET.fromstring(xml_content)
 
                 if root.tag == "file":
+                    # Validate action name
+                    action = root.get("action")
+                    if action != "create_file":
+                        raise ValueError(f"Invalid action '{action}'. Expected 'create_file' for create_file method.")
+
                     # Extract path from XML if specified
                     if xml_path := root.get("path"):
                         # Resolve relative to first allowed directory
@@ -106,36 +111,103 @@ class FileTools(BaseTools):
 
         return f"Moved file to trash: {trash_path}"
 
-    async def modify_file(self, path: str, replacements: dict[str, str]) -> str:
+    async def modify_file(self, path: str, replacements: dict[str, str] | None = None, xml_content: str | None = None) -> str:
         path = await self.validate_path(path)
-        original_content = await self.read_file(path)
-        content = original_content
+        try:
+            target_path = path
+            actual_content = backup_content = target_path.read_text()
 
-        for old, new in replacements.items():
-            content = content.replace(old, new)
+            if xml_content:
+                root = ET.fromstring(xml_content)
 
-        diff = self.generate_diff(original_content, content)
-        if not diff:
-            raise ValueError("No changes detected in the file content")
+                if root.tag == "file":
+                    action = root.get("action")
+                    if action != "modify_file":
+                        raise ValueError(f"Invalid action '{action}'. Expected 'modify_file' for modify_file method.")
 
-        await self._write_file(path, content)
-        return diff
+                    # Extract path from XML if specified
+                    if xml_path := root.get("path"):
+                        # Resolve relative to first allowed directory
+                        base_path = Path(self.allowed_paths[0]) if self.allowed_paths else Path.cwd()
+                        target_path = (base_path / xml_path).resolve()
+
+                        # Re-validate with resolved path
+                        target_path = await self.validate_path(str(target_path))
+
+                        # Check if XML path matches parameter path
+                        if str(target_path) != str(path):
+                            raise ValueError(f"XML path '{xml_path}' does not match parameter path '{path}'")
+                    else:
+                        raise ValueError("Path not specified in XML")
+
+                    # Extract content and search from respective elements and create replacements dict
+                    replacements = {}
+
+                    search_node = root.find("search")
+                    content_node = root.find("content")
+                    if search_node is not None and search_node.text and content_node is not None and content_node.text:
+                        replacements[search_node.text.strip()] = content_node.text.strip()
+                    else:
+                        raise ValueError("Both <search> and <content> tags are required for modify_file")
+
+                    # Replace each key, value pair in replacements dict and raise error in any case. If error then restore actual_content.
+                    for old, new in replacements.items():
+                        actual_content = actual_content.replace(old, new)
+
+                    if not actual_content:
+                        raise ValueError("No valid <content> found in <change> elements")
+                else:
+                    raise ValueError(f"Invalid XML root tag: {root.tag}")
+
+            elif replacements:
+                # Replace each key, value pair in replacements dict and raise error in any case. If error then restore actual_content.
+                for old, new in replacements.items():
+                    actual_content = actual_content.replace(old, new)
+
+                if not actual_content:
+                    raise ValueError("No valid <content> found in <change> elements")
+            else:
+                raise ValueError("Either replacements or xml_content must be provided")
+
+            diff = self.generate_diff(backup_content, actual_content)
+            if not diff:
+                raise ValueError("No changes detected in the file content")
+
+            await self._write_file(path, actual_content)
+            return diff
+        except Exception as e:
+            error_message = self.handle_error(e, {"operation": "rewrite_file", "path": str(path)})
+            return f"Error rewriting file: {error_message}"
 
     async def rewrite_file(self, path: str, content: str | None = None, xml_content: str | None = None) -> str:
         if xml_content:
-            tree = ET.fromstring(xml_content)
+            root = ET.fromstring(xml_content)
 
-            # Use the root element directly since it's the 'file' element
-            file_element = tree if tree.tag == "file" else None
-            if file_element is None:
-                raise ValueError("Invalid XML: root element must be 'file'")
-            xml_path = file_element.get("path")
-            if xml_path != path:
-                raise ValueError(f"XML path '{xml_path}' does not match parameter path '{path}'")
-            content_element = file_element.find(".//content")
-            if content_element is None or not content_element.text:
-                raise ValueError("Invalid XML: missing or empty 'content' element")
-            actual_content = content_element.text.strip()
+            if root.tag == "file":
+                # Validate action name
+                action = root.get("action")
+                if action != "rewrite_file":
+                    raise ValueError(f"Invalid action '{action}'. Expected 'rewrite_file' for rewrite_file method.")
+
+                # Extract path from XML if specified
+                if xml_path := root.get("path"):
+                    if xml_path != path:
+                        raise ValueError(f"XML path '{xml_path}' does not match parameter path '{path}'")
+                else:
+                    raise ValueError("Path not specified in XML")
+
+                # Extract content from all <change> elements
+                actual_content = ""
+                for change in root.findall("change"):
+                    content_node = change.find("content")
+                    if content_node is not None and content_node.text:
+                        actual_content += content_node.text.strip() + "\n"
+
+                if not actual_content:
+                    raise ValueError("No valid <content> found in <change> elements")
+
+            else:
+                raise ValueError(f"Invalid XML root tag: {root.tag}")
         elif content is not None:
             actual_content = content
         else:

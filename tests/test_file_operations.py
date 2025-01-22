@@ -64,7 +64,7 @@ async def test_create_file_with_xml_content(file_tools):
     """Test file creation using XML content specification"""
     test_file = TEST_DIR / "xml_created.txt"
     xml_content = f"""<?xml version="1.0"?>
-    <file path="{test_file}" action="create">
+    <file path="{test_file}" action="create_file">
         <change>
             <content><![CDATA[
                 import pytest
@@ -94,6 +94,25 @@ async def test_modify_file(file_tools):
 
     replacements = {"world": "Python"}
     diff = await file_tools.modify_file(str(test_file), replacements)
+
+    assert "Hello Python!" == await file_tools.read_file(str(test_file))
+    assert "-Hello world!" in diff
+    assert "+Hello Python!" in diff
+
+
+@pytest.mark.asyncio
+async def test_modify_file_with_xml_content(file_tools):
+    test_file = TEST_DIR / "modify_xml.txt"
+    original_content = "Hello world!"
+    await file_tools.create_file(str(test_file), content=original_content)
+
+    xml_content = f"""<?xml version="1.0"?>
+    <file path="{str(test_file)}" action="modify_file">
+        <search>world</search>
+        <content>Python</content>
+    </file>"""
+
+    diff = await file_tools.modify_file(str(test_file), xml_content=xml_content)
 
     assert "Hello Python!" == await file_tools.read_file(str(test_file))
     assert "-Hello world!" in diff
