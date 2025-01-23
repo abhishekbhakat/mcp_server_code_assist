@@ -32,7 +32,7 @@ class InternetTools:
             Tuple of (answer_text, relevant_citation_urls)
         """
         payload = {
-            "model": "llama-3.1-sonar-huge-128k-online",
+            "model": "sonar",
             "return_images": False,
             "return_related_questions": False,
             "stream": False,
