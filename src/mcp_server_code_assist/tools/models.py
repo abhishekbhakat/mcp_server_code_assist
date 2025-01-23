@@ -103,6 +103,10 @@ class AskInternet(BaseModel):
     query: str
 
 
+class GetChainOfThought(BaseModel):
+    query: str
+
+
 # Specialized Prompt tools
 # ====================================================================
 class GenerateGitCommands(BaseModel):

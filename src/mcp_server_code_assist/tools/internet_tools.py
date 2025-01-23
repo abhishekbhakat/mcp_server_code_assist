@@ -6,9 +6,10 @@ import aiohttp
 
 class InternetTools:
     def __init__(self):
-        self.api_key = os.getenv("PERPLEXITY_API_KEY")
+        self.perplexity_api_key = os.getenv("PERPLEXITY_API_KEY")
+        self.deepseek_api_key = os.getenv("DEEPSEEK_API_KEY")
         self.base_url = "https://api.perplexity.ai/chat/completions"
-        self.headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
+        self.headers = {"Authorization": f"Bearer {self.perplexity_api_key}", "Content-Type": "application/json"}
 
     def _process_citations(self, answer: str, citations: list[str]) -> str:
         """Process citations in the answer and return formatted answer with citations."""
@@ -48,3 +49,29 @@ class InternetTools:
         citations = json_response.get("citations", [])
 
         return self._process_citations(answer, citations)
+
+    async def chain_of_thought(self, query: str) -> str:
+        """Get chain of thought for a given query.
+
+        Args:
+            query: The question to ask
+
+        Returns:
+            The chain of thought as a string
+        """
+        url = "https://api.deepseek.com/chat/completions"
+        headers = {"Content-Type": "application/json", "Authorization": f"Bearer {self.deepseek_api_key}"}
+        payload = {
+            "model": "deepseek-reasoner",
+            "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": query},
+            ],
+            "stream": False,
+        }
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=payload) as response:
+                result = await response.json()
+                reasoning_content = result["choices"][0]["message"]["reasoning_content"]
+                return reasoning_content

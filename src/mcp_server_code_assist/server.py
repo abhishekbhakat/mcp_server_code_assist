@@ -19,6 +19,7 @@ from mcp_server_code_assist.tools.models import (
     FileTree,
     GenerateCliCommands,
     GenerateGitCommands,
+    GetChainOfThought,
     GitDiff,
     GitLog,
     GitShow,
@@ -46,7 +47,10 @@ class CodeAssistTools(str, Enum):
     GIT_DIFF = "git_diff"
     GIT_LOG = "git_log"
     GIT_SHOW = "git_show"
+
+    # Internet operations
     ASK_INTERNET = "ask_internet"
+    GET_CHAIN_OF_THOUGHT = "get_chain_of_thought"
 
     # Specialized Prompt Tools
     GENERATE_CLI_COMMANDS = "generate_cli_commands"
@@ -86,6 +90,8 @@ async def process_instruction(instruction: dict[str, Any], repo_path: Path) -> d
                 return {"show": git_tools.show(str(repo_path), instruction["commit"])}
             case "ask_internet":
                 return await internet_tools.ask(instruction["query"])
+            case "get_chain_of_thought":
+                return await internet_tools.chain_of_thought(instruction["query"])
             case "generate_cli_commands":
                 return await specialized_prompt_tools.generate_cli_commands(instruction["query"])
             case "generate_git_commands":
@@ -185,6 +191,15 @@ async def serve(working_dir: Path | None) -> None:
                     name=CodeAssistTools.ASK_INTERNET,
                     description="Asks questions to Internet and returns answer with citations",
                     inputSchema=AskInternet.model_json_schema(),
+                )
+            )
+        if os.getenv("DEEPSEEK_API_KEY"):
+            tools.append(
+                # DeepSeek operations
+                Tool(
+                    name=CodeAssistTools.GET_CHAIN_OF_THOUGHT,
+                    description="Get chain of thought for a given question",
+                    inputSchema=GetChainOfThought.model_json_schema(),
                 )
             )
         return tools
