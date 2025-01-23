@@ -195,7 +195,7 @@ async def serve(working_dir: Path | None) -> None:
             )
         if os.getenv("DEEPSEEK_API_KEY"):
             tools.append(
-                # DeepSeek operations
+                # Internet operations
                 Tool(
                     name=CodeAssistTools.GET_CHAIN_OF_THOUGHT,
                     description="Get chain of thought for a given question",
@@ -276,9 +276,15 @@ async def serve(working_dir: Path | None) -> None:
                 model = GitShow(repo_path=arguments["repo_path"], revision=arguments["commit"])
                 result = await git_tools.show(model.repo_path, model.revision)
                 return [TextContent(type="text", text=result)]
+
+            # Internet operations
             case CodeAssistTools.ASK_INTERNET:
                 model = AskInternet(query=arguments["query"])
                 result = await internet_tools.ask(model.query)
+                return [TextContent(type="text", text=result)]
+            case CodeAssistTools.GET_CHAIN_OF_THOUGHT:
+                model = GetChainOfThought(query=arguments["query"])
+                result = await internet_tools.chain_of_thought(model.query)
                 return [TextContent(type="text", text=result)]
 
             # Specialized Prompt Tools
